@@ -1,7 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View, StyleSheet, Text, TextInput, TouchableOpacity, Alert, FlatList} from "react-native";
+
+import * as SQLite from 'expo-sqlite';
+
 
 
 
@@ -9,6 +12,37 @@ const ListaTarefas = () => {
 
     const [tarefa, setTarefa] = useState('');
     const [lista, setLista] = useState([]);
+
+    const [db, setDb] = useState(null);//armazenar uma intancia banco de dados
+
+      useEffect(() => {
+         (async () =>{
+            //abre banco de dados
+            const database = await SQLite.openDatabaseAsync('tarefas.db')
+            setDb(database);
+            criarTabela(database)
+         })
+      },[]);      
+
+      //funçao para criar 
+      const criarTabela = async (database)=> {
+        try {
+            await database.execAsync(`
+                          CREATE TABLE IF NOT EXISTS tarefas(
+                          id INTEREGER PRIMARY KEY AUTOINCREMENT,
+                          descricao TEXT NOT NULL                )
+                
+                `);
+                console.log(`tabela criada ou já existe`);
+                
+            
+        } catch (error) {
+            console.error('Erro ao criar a tabela', error);   
+        };
+      };
+
+
+
 
 
     // npm install @react-native-async-storage/async-storage
@@ -37,16 +71,24 @@ const ListaTarefas = () => {
     }
 
     const adicionarTarefa = async () =>{
-        try {
+       
             if (tarefa.trim() === '') {
                 Alert.alert('erro','Digite uma Tarefa nova')
                 return;
             }
 
-            const novaLista = [...lista, tarefa];
-            setLista(novaLista);
-            salvarTarefas(novaLista);
-            setTarefa('')
+            const result = await db.runAsync(
+              `INSERT INTO tarefas (descricao) VALUE (?)`,
+              tarefa);
+
+              const novaTarefa = {
+                      id: result.lastInsertRowId,
+                      descricao: tarefa
+              };
+
+              setLista( previaLista => [...previaLista, novaTarefa])
+
+            try {
             
         } catch (error) {
             console.error('erros ao carregar', error)
