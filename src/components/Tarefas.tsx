@@ -1,204 +1,219 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
-import { View, StyleSheet, Text, TextInput, TouchableOpacity, Alert, FlatList} from "react-native";
-
+import { StatusBar } from 'expo-status-bar';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, FlatList } from "react-native";
 import * as SQLite from 'expo-sqlite';
-
-
 
 
 const ListaTarefas = () => {
 
     const [tarefa, setTarefa] = useState('');
     const [lista, setLista] = useState([]);
+    const [db, setDb] = useState(null); // Armazenar uma instância do banco de dados
 
-    const [db, setDb] = useState(null);//armazenar uma intancia banco de dados
 
-      useEffect(() => {
-         (async () =>{
-            //abre banco de dados
-            const database = await SQLite.openDatabaseAsync('tarefas.db')
-            setDb(database);
-            criarTabela(database)
-         })
-      },[]);      
+    // useEffect para carregar as tarefas salvas ao abrir o app
+    useEffect(() => {
+        (async () => {
+            // Abre o banco de dados
+            const databse = await SQLite.openDatabaseAsync('tarefas.db')
+            setDb(databse);
+            criarTabela(databse);
+            carregarTarefas(databse);
+        })();
+    }, []);
 
-      //funçao para criar 
-      const criarTabela = async (database)=> {
+
+    // Função para Criar a tabela no banco de dados
+    const criarTabela = async (databse) => {
         try {
-            await database.execAsync(`
-                          CREATE TABLE IF NOT EXISTS tarefas(
-                          id INTEREGER PRIMARY KEY AUTOINCREMENT,
-                          descricao TEXT NOT NULL                )
-                
-                `);
-                console.log(`tabela criada ou já existe`);
-                
-            
+            await databse.execAsync(`
+                CREATE TABLE IF NOT EXISTS tarefas (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    descricao TEXT NOT NULL
+                );
+            `);
+            console.log('Tabela criada ou já existe!')
         } catch (error) {
-            console.error('Erro ao criar a tabela', error);   
+            console.error('Erro ao criar a tabela:', error);
         };
-      };
+    };
 
 
-
-
-
-    // npm install @react-native-async-storage/async-storage
-
-    const salvarTarefas = async (tarefas) =>{
-        try {
-            await AsyncStorage.setItem('tarefas', JSON.stringify(tarefas));// CONVERTE STRING EM LISTA
-            
-        } catch (error) {
-            console.error('erros ao salvar', error)
+    // Função para adicionar uma nova tarefa
+    const adicionarTarefa = async () => {
+        if(tarefa.trim() === ''){
+            Alert.alert('Erro', 'Digite uma tarefa válida!');
+            return;
         }
 
-    }
-
-    const carregarTarefas = async () =>{
         try {
-            const tarefasSalvas = await AsyncStorage.getItem('tarefas')
-            if (tarefasSalvas) {
-                setLista(JSON.parse(tarefasSalvas)); //CONVERTE JSON DE VOLTA PARA  ARRAY
-            }
-            
+            const result = await db.runAsync(`INSERT INTO tarefas (descricao) VALUES (?)`, tarefa );
+            const novaTarefa = { id: result.lastInsertRowId, descricao: tarefa };
+            // atualiza o estado com a nova tarefa
+            setLista(prevLista => [...prevLista, novaTarefa])
+            // limpa o campo input
+            setTarefa('');
         } catch (error) {
-            console.error('erros ao carregar', error)
+            console.error('Erro ao adicionar tarefa:', error);
         }
-
     }
 
-    const adicionarTarefa = async () =>{
-       
-            if (tarefa.trim() === '') {
-                Alert.alert('erro','Digite uma Tarefa nova')
-                return;
-            }
+    // Função para carregar as tarefas do banco de dados
+    const carregarTarefas = async (databse) => {
+        try {
+            const tarefas = await databse.getAllAsync('SELECT * FROM tarefas');
+            setLista(tarefas);
+        } catch (error) {
+            console.error('Erro ao carregar tarefas:', error);
+        }
+    }
 
-            const result = await db.runAsync(
-              `INSERT INTO tarefas (descricao) VALUE (?)`,
-              tarefa);
+        // Função para carregar remover uma as tarefas da lista
 
-              const novaTarefa = {
-                      id: result.lastInsertRowId,
-                      descricao: tarefa
-              };
-
-              setLista( previaLista => [...previaLista, novaTarefa])
-
+        const removerTarefa = async (id) =>{
             try {
-            
-        } catch (error) {
-            console.error('erros ao carregar', error)
+                await db.runAsync('DELETE FROM tarefas  WHERE   id = ?', id);
+                setLista(prevLista => prevLista.filter(tarefa => tarefa.id !== id))     
+                
+            } catch (error) {
+                console.error('Erro ao remover tarefas:', error);
+
+                
+            }
+
         }
 
-    }
 
-    const removerTarefa = async (index) =>{
 
-        const novaLista = lista.filter((_,i)=> i !== index);
-        setLista(novaLista);
-        salvarTarefas(novaLista);
-    }
+
+
+
+
+
+
+
+
+ 
+    // // Função para Salvar tarefas
+    // const salvarTarefas = async (tarefas) => {
+    //     try {
+    //         await AsyncStorage.setItem('tarefas', JSON.stringify(tarefas)) // converte a lista para string JSON
+    //     } catch (error) {
+    //         console.error('Erros ao salvar:', error)
+    //     }
+    // };
+
+
+
+    // // Função para Carregar as tarefas
+    // const carregarTarefas = async () => {
+    //     try {
+    //         const tarefasSalvas = await AsyncStorage.getItem('tarefas');
+    //         if(tarefasSalvas) {
+    //             setLista(JSON.parse(tarefasSalvas)); // converte JSON de volta para array
+    //         }
+    //     } catch (error) {
+    //         console.error('Erros ao carregar:', error)
+    //     }
+    // }
+
+
+
+    // // Função para adicionar uma nova tarefa
+    // const adicionarTarefa = () => {
+    //     if(tarefa.trim() === ''){
+    //         Alert.alert('Erro', 'Digite uma tarefa válida!');
+    //         return;
+    //     }
+
+    //     const novaLista = [...lista, tarefa];
+    //     setLista(novaLista);
+    //     salvarTarefas(novaLista);
+    //     setTarefa('');
+    // }
+
+
+
+    // // Função para remover uma tarefa da lista
+    // const removerTarefa = (index) => {
+    //     const novaLista = lista.filter((_, i) => i !== index);
+    //     setLista(novaLista); // Atualiza o estado da lista
+    //     salvarTarefas(novaLista); // Atualiza o AsyncStorage com a nova lista
+    // }
 
 
 
     return(
         <View style={styles.container}>
+            <Text style={styles.titulo}>Lista de Tarefas</Text>
 
-            <StatusBar style="auto"/>
+            <TextInput 
+                style={styles.input}
+                placeholder='Digite a tarefa'
+                value={tarefa}
+                onChangeText={setTarefa}
+            />
 
-        <Text style={styles.titulo}>Lista de Tarefas</Text>
-        <TextInput
-        style={styles.input} 
-        placeholder="Digite a tarefa"
-        value={tarefa}
-        onChangeText={setTarefa}
+            <TouchableOpacity style={styles.botao} onPress={adicionarTarefa}>
+                <Text style={styles.textoBotao}>Adicionar</Text>
+            </TouchableOpacity>
 
+            <FlatList
+                data={lista} // lista de tarefas
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={({ item }) => (
+                    <View style={styles.item}>
+                        <Text>{item.descricao}</Text>
+                        <TouchableOpacity onPress={() => removerTarefa(item.id)}>
+                            <Text>❌</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+            />
 
-        />
-
-        <TouchableOpacity style={styles.botao} onPress={adicionarTarefa}>
-            <Text style={styles.botao_texto}>Adicionar</Text>
-        </TouchableOpacity>
-
-        <FlatList
-        data={lista}
-        keyExtractor={(item, index) => index.toString ()}
-        renderItem={({ item,index }) => (
-
-            <View style={styles.item}>
-                <Text>{item}</Text>
-                <TouchableOpacity onPress={() =>removerTarefa(index)}>
-                    <Text>❌</Text>
-                </TouchableOpacity>
-            </View>
-
-              )
-
-        
-        }
-        />
-      </View>
+            <StatusBar style="auto" />
+        </View>        
     );
-
-}
-
-export default ListaTarefas
-
+};
 
 const styles = StyleSheet.create({
     container: {
-      flex: 1,
-      backgroundColor: '#f5f5f5',
-      padding: 16
+        flex: 1,
+        padding: 16,
+        backgroundColor: "#f5f5f5",
     },
-
     titulo: {
         fontSize: 24,
         fontWeight: "bold",
         textAlign: "center",
-        marginBottom: 20
+        marginTop: 30,
+        marginBottom: 20,
     },
-    input:{
-        width:"100%",
-        height:40,
-        backgroundColor: '#fff', 
-        borderColor: 'black',
-        borderWidth:1,
+    input: {
+        backgroundColor: '#fff',
         paddingHorizontal: 10,
-        borderRadius:5,
-        marginBottom: 20
-
-
+        borderRadius: 5,
+        marginBottom: 20,
     },
-
-    botao:{
+    botao: {
         backgroundColor: "#e63946",
         padding: 10,
-        borderRadius:5,
-        alignItems:"center",
-        marginBottom: 20
-
-
+        borderRadius: 5,
+        alignItems: 'center',
     },
-    botao_texto:{
-        color: "#fff",
+    textoBotao: {
+        color: "#ffffff",
         fontWeight: 'bold',
-        fontSize: 16
-
+        fontSize: 16,
     },
     item: {
-        flexDirection: "row",
-        justifyContent:"space-between",
-        padding:15,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        padding: 15,
         backgroundColor: '#fff',
-        marginTop:10,
-        borderRadius:5,
-
+        marginTop: 10,
+        borderRadius: 5,
     }
+})
 
-
-  });
+export default ListaTarefas;
